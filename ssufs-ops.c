@@ -106,7 +106,7 @@ int ssufs_read(int file_handle, char *buf, int nbytes){
 	printf("blknum:%d\n",blknum);
 	
 	for(int i=0;i<=blknum;i++){//0 is blk1
-		ssufs_readDataBlock(tmp->direct_blocks[i],tmpbuf+i*BLOCKSIZE);
+		ssufs_readDataBlock(tmp->direct_blocks[i],tmpbuf);//+i*BLOCKSIZE);
 	}
 	printf("tmpbuf:%s\n",tmpbuf);
 	strncpy(buf, tmpbuf + start_offset, nbytes);
