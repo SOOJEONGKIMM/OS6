@@ -10,18 +10,18 @@ int main()
     ssufs_create("f1.txt");
     int fd1 = ssufs_open("f1.txt");
 
-    for(int i=0;i<3;i++){
-        printf("Write Data: %d\n", ssufs_write(fd1, str, 16));
-        printf("whree~~~~++~~~~~~~~~~\n");
+    for(int i=0;i<20;i++){
+        printf("Write Data: %d\n", ssufs_write(fd1, str, 24));
         ssufs_dump();
         
     }
-
-    printf("Seek: %d\n", ssufs_lseek(fd1, -256));
-    for(int i=0;i<3;i++){
-        printf("%d Read : %d\n",i,ssufs_read(fd1,buf,16));
+    
+    printf("Seek: %d\n", ssufs_lseek(fd1, -240));
+    for(int i=0;i<20;i++){
+        printf("%d Read : %d\n",i,ssufs_read(fd1,buf,24));
         printf("Read Data: %s\n", buf);
     }
+    printf("hi?\n");
     ssufs_dump();
     ssufs_delete("f1.txt");
     ssufs_dump();
