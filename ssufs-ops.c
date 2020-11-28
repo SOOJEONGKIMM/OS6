@@ -81,7 +81,8 @@ int ssufs_read(int file_handle, char *buf, int nbytes){
 	/* 4 */
 	int inodenum;
 	char tmpbuf[BLOCKSIZE];
-	memset(tmpbuf, -1, BLOCKSIZE);
+	tmpbuf[BLOCKSIZE]='\0';
+	//memset(tmpbuf, -1, BLOCKSIZE);
 	
 	struct inode_t *tmp = (struct inode_t *) malloc(sizeof(struct inode_t));
 	inodenum=file_handle_array[file_handle].inode_number;
@@ -93,9 +94,11 @@ int ssufs_read(int file_handle, char *buf, int nbytes){
 	int start_offset=file_handle_array[file_handle].offset;
 	int last_offset = file_handle_array[file_handle].offset + nbytes;
 	int blksize = tmp->file_size / BLOCKSIZE;
+	if(blksize!=0){
 	if(tmp->file_size % BLOCKSIZE == 0)
-		blksize=0;
-		//blksize--;
+		blksize--;
+		//blksize=0;
+	}
 	
 	for(int i=0;i<=blksize;i++){//0 is blk1
 		ssufs_readDataBlock(tmp->direct_blocks[i],tmpbuf+i*BLOCKSIZE);
@@ -111,7 +114,7 @@ int ssufs_write(int file_handle, char *buf, int nbytes){
 	/* 5 */
 	int inodenum=0;
 	char tmpbuf[BLOCKSIZE];
-	memset(tmpbuf, -1, BLOCKSIZE);
+	tmpbuf[BLOCKSIZE]='\0';
 	struct inode_t *tmp = (struct inode_t *) malloc(sizeof(struct inode_t));
 	
 	inodenum=file_handle_array[file_handle].inode_number;
@@ -207,6 +210,9 @@ printf("debug  blksize@@@@@@@@@@@@@@@@@@@@@@@@@:%d\n",blksize);
 tmpbuf[BLOCKSIZE]='\0';
 	char tmpbuf2[BLOCKSIZE];
 	//memset(tmpbuf2, -1 , BLOCKSIZE);
+	strncpy(tmpbuf, buf, nbytes);
+	tmpbuf[nbytes]='\0';
+	printf("debug tmpbuf~~~~~~~~~~~~~~~~~~:%s\n",tmpbuf);
 	for(int i=0;i<blksize;i++){//0 is blk1
 	//for(int i=0;i<NUM_INODES;i++){
 	//for(int i=0;i<MAX_FILE_SIZE;i++){
@@ -214,14 +220,20 @@ tmpbuf[BLOCKSIZE]='\0';
 		tmpbuf2[BLOCKSIZE]='\0';
 		printf("debug tmpbuf2@@@@@@@@@@@@@@@@@@@@@@@@@:%s\n",tmpbuf2);
 		printf("direct_blocks[%d]:%d\n",i,tmp->direct_blocks[i]);
-		ssufs_readDataBlock(tmp->direct_blocks[i],tmpbuf2+1);//get original buf
+		ssufs_readDataBlock(tmp->direct_blocks[i],tmpbuf2);//get original buf
+		
 		printf("debug tmpbuf2@@@@@@@@@@@@@@@@@@@@@@@@@:%s\n",tmpbuf2);
-		strncat(tmpbuf, tmpbuf2, strlen(tmpbuf2));//update with new data 
+		strncat(tmpbuf+1, tmpbuf2, nbytes);//update with new data 
 		printf("debug tmpbuf@@@@@@@@@@@@@@@@@@@@@@@@@:%s\n",tmpbuf);
 	//}
 	}
-	strncpy(tmpbuf+start_offset, buf, nbytes);
+	//strncpy(tmpbuf+start_offset, buf, nbytes);
+	
+	printf("debug0000000000000000000000000000:%s\n",tmpbuf);
 	int buflen=strlen(tmpbuf);
+	truncate(tmpbuf,nbytes);
+	printf("buflen:%d\n",buflen);
+	printf("debug0000000000000000000000000000:%s\n",tmpbuf);
 	//if(buflen < start_offset+nbytes){
 	//	return -1;
 	//}
@@ -229,6 +241,7 @@ tmpbuf[BLOCKSIZE]='\0';
 	//strncpy(tmpbuf + start_offset, buf, nbytes);
 
 	//strncpy(tmpbuf , buf, nbytes);
+	printf("debug0000000000000000000000000000:%s\n",tmpbuf);
 	if(start_offset + nbytes > 256){
 		//free(tmp);
 		printf("over 256...\n");
@@ -257,10 +270,15 @@ tmpbuf[BLOCKSIZE]='\0';
 			//	return -1;
 			//tmp_direct_blocks[i] = blknum;
 		}*/
+		char truncatebuf[BLOCKSIZE];
+		printf("debug0000000000000000000000000000:%s\n",tmpbuf);
 		for(int i=0;i<= update_blknum;i++){
 			if(tmp->direct_blocks[i]!=-1){
+				truncatebuf[BLOCKSIZE]='\0';
+				printf("nbytes:%d\n",nbytes);
+				strncpy(truncatebuf,tmpbuf,nbytes);
 				ssufs_writeDataBlock(tmp->direct_blocks[i], tmpbuf);//+i*BLOCKSIZE);
-				printf("debug++++++++++++++++++++++++++++++++++:%d\n",tmp->direct_blocks[i]);
+				printf("debug++++++++++++++++++++++++++++++++++:%s\n",tmpbuf);
 			}
 		}
 		
