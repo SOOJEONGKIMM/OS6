@@ -12,7 +12,9 @@ int main()
 
     for(int i=0;i<20;i++){
         printf("Write Data: %d\n", ssufs_write(fd1, str, 16));
+        printf("whree~~~~++~~~~~~~~~~\n");
         ssufs_dump();
+        
     }
 
     printf("Seek: %d\n", ssufs_lseek(fd1, -256));
