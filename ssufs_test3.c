@@ -9,9 +9,12 @@ int main()
     int fd1 = ssufs_open("f1.txt");
 
     printf("Write Data: %d\n", ssufs_write(fd1, str, BLOCKSIZE));
+    ssufs_dump();
+    printf("Write Data: %d\n", ssufs_write(fd1, str, BLOCKSIZE));
+    ssufs_dump();
     printf("Write Data: %d\n", ssufs_write(fd1, str, BLOCKSIZE));
     printf("Write Data: %d\n", ssufs_write(fd1, str, BLOCKSIZE));
-    printf("Write Data: %d\n", ssufs_write(fd1, str, BLOCKSIZE));
+    ssufs_dump();
     printf("Seek: %d\n", ssufs_lseek(fd1, 0));
     ssufs_dump();
 
