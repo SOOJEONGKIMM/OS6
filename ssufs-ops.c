@@ -84,7 +84,8 @@ int ssufs_read(int file_handle, char *buf, int nbytes){
 	char tmpbuf[BLOCKSIZE];
 	tmpbuf[BLOCKSIZE]='\0';
 	
-	
+	printf("start||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||\n");
+
 	struct inode_t *tmp = (struct inode_t *) malloc(sizeof(struct inode_t));
 	
 	inodenum=file_handle_array[file_handle].inode_number;
@@ -94,51 +95,101 @@ int ssufs_read(int file_handle, char *buf, int nbytes){
 		//free(tmp);
 		return -1;
 	}
-	int blkcnt=0;
-	for(int i=0;i<NUM_DATA_BLOCKS;i++){
-		if(tmp->direct_blocks[i]==-1){
-			blkcnt=i;
-			break;
-		}
-	}
 	int start_offset=file_handle_array[file_handle].offset;
 	int last_offset=file_handle_array[file_handle].offset+nbytes;
+	
 	//if(blkcnt==0 && totalblk==3)
 	//	blkcnt=4;
-	if(last_offset%BLOCKSIZE == nbytes){
-		blkcnt++;
-	}
-	int firstblknum;
-	if(blkcnt==0)
-		firstblknum=0;
-	else if(blkcnt>0 && last_offset%BLOCKSIZE>0)
-		firstblknum=blkcnt-1;
-
+	
 	
 	printf("debug start_offset:%d\n",start_offset);
-	int blknum = start_offset / BLOCKSIZE;
-	if(blknum!=0){
-		if(start_offset % BLOCKSIZE == 0)
-			blknum--;
-	}
+	printf("debug last_offset:%d\n",last_offset);
+	int firstblknum = start_offset / BLOCKSIZE;
 	printf("firstblknum:%d\n",firstblknum);
-	printf("blknum:%d\n",blknum);
-	int backup = start_offset % BLOCKSIZE;
+	/*if(firstblknum!=0){
+		if(start_offset % BLOCKSIZE == 0)
+			firstblknum--;
+		else if(start_offset % BLOCKSIZE == 0 && last_offset%BLOCKSIZE == nbytes){
+		firstblknum++;
+	}
+	}*/
 	
-	for(int i=firstblknum;i<=blknum+firstblknum;i++){//0 is blk1
+	
+	//if(blknum>0 && last_offset%BLOCKSIZE>0)
+	//	firstblknum=blknum-1;
+	
+	int totalblk = last_offset / BLOCKSIZE;//'0 totalblk' means using 1 block
+	printf("totalblk:%d\n",totalblk);
+	if(totalblk!=0){
+	if((last_offset % BLOCKSIZE) == 0)
+		totalblk--;
+	}
+	if(tmp->file_size==0)
+		totalblk=0;
+
+	int update_blknum = nbytes / BLOCKSIZE; //blk that is updating
+	if(update_blknum!=0){
+		if(nbytes % BLOCKSIZE == 0){
+			update_blknum--;
+		} 
+	}
+	int blkuse=0; //using block
+	if(totalblk>=0 && ((tmp->file_size % BLOCKSIZE) != 0)){//0 is blk1
+		blkuse=1;
+		if(totalblk>=1 && (last_offset-BLOCKSIZE*totalblk) < nbytes){//uses two blk
+			blkuse=2;
+			if(totalblk>=2 && update_blknum>=1 && blkuse==2){//uses three blk
+				blkuse=3;
+				if(totalblk>=3 && update_blknum>=2 && blkuse==3){//uses four blk
+						blkuse=4;
+				}
+			}
+		}
+	}
+
+	printf("firstblknum:%d\n",firstblknum);
+	
+	printf("blkuse:%d\n",blkuse);
+	//int backup = (last_offset % BLOCKSIZE) - BLOCKSIZE;
+	int backup;
+	if(start_offset % BLOCKSIZE == 0)
+		backup = 0;
+	else
+		backup = BLOCKSIZE - (start_offset % BLOCKSIZE) ;
+	int nextblkdata = last_offset % BLOCKSIZE;
+	
+	memset(buf,'\0',BLOCKSIZE);
+	printf("before buf:%s\n",buf);
+	for(int i=firstblknum;i<blkuse+firstblknum;i++){//0 is blk1
 		ssufs_readDataBlock(tmp->direct_blocks[i],tmpbuf);//+i*BLOCKSIZE);
-		if(i==firstblknum)
-			strncpy(buf, tmpbuf + start_offset, BLOCKSIZE-backup);
+		printf("tmpbuf:%s\n",tmpbuf);
+		printf("backup:%d\n",backup);
+		if(i==firstblknum){
+			if(blkuse>1){
+				printf("i is firstblk and blkuse>1\n");
+				strncpy(buf, tmpbuf + start_offset%BLOCKSIZE, backup);//ex)!----32 bytes 
+			}
+			else if(blkuse==1){
+				printf("i is firstblk and blkuse==1\n");
+				if(start_offset%BLOCKSIZE==0)
+					strncpy(buf, tmpbuf, nbytes);//ex)!---32 bytes of data----|
+				else
+					strncpy(buf, tmpbuf + start_offset%BLOCKSIZE, nbytes);//ex)!---32 bytes of data----|
+			}
+		}
 		else if(i==firstblknum+1)
-			strncat(buf, tmpbuf+(BLOCKSIZE-backup), nbytes-(BLOCKSIZE-backup));
+			strncat(buf, tmpbuf+start_offset, nextblkdata);//ex)of data------|
+			//strncat(buf, tmpbuf+(BLOCKSIZE-backup), nbytes-(BLOCKSIZE-backup));//ex)of data------|
+		printf("now buf:%s\n",buf);
+		printf("buflen:%d\n",strlen(buf));
 	}
 	
 	
 	//strncpy(buf, tmpbuf, nbytes);
 	ssufs_lseek(file_handle, nbytes);
 	
-	printf("buf:%s--------------------------------------------------\n",tmpbuf);
-
+	
+	
 	//file_handle_array[file_handle].offset = last_offset;//if succeed
 	//free(tmp);
 	return 0;
@@ -157,11 +208,11 @@ int ssufs_write(int file_handle, char *buf, int nbytes){
 	int blknum=0;
 		
 	int start_offset=file_handle_array[file_handle].offset;
-	printf("start_offset:%d\n",start_offset);
+	///printf("start_offset:%d\n",start_offset);
 	int last_offset = file_handle_array[file_handle].offset + nbytes;// + nbytes;
-	printf("last_offset:%d\n",last_offset);
+	//printf("last_offset:%d\n",last_offset);
 	int totalblk = last_offset / BLOCKSIZE;
-	printf("totalblk:%d\n",totalblk);
+	//printf("totalblk:%d\n",totalblk);
 	if(totalblk!=0){
 	if((last_offset % BLOCKSIZE) == 0)
 		totalblk--;
@@ -192,7 +243,7 @@ int ssufs_write(int file_handle, char *buf, int nbytes){
 	else if(start_offset%BLOCKSIZE==0){
 		blkcnt++;
 	}
-	printf("blkcnt:%d\\\\\\\\\\\n",blkcnt);
+	//printf("blkcnt:%d\\\\\\\\\\\n",blkcnt);
 
 
 	int update_blknum = nbytes / BLOCKSIZE;
@@ -227,7 +278,7 @@ int ssufs_write(int file_handle, char *buf, int nbytes){
 			else if(tmp->direct_blocks[i]==-1){
 				
 				blknum=ssufs_allocDataBlock();
-				printf("0 1 -1 -1 blknum:%d\n",blknum);
+				//printf("0 1 -1 -1 blknum:%d\n",blknum);
 				if(blknum==-1){//no free block
 					//free(tmp);
 				
@@ -246,7 +297,7 @@ int ssufs_write(int file_handle, char *buf, int nbytes){
 			blknum=ssufs_allocDataBlock();
 			//if(last_offset > tmp->file_size)
 			//		return -1;
-			printf("-1 -1 -1 -1 blknum:%d\n",blknum);
+			//printf("-1 -1 -1 -1 blknum:%d\n",blknum);
 			if(blknum==-1){//no free block
 				//free(tmp);
 				return -1;
@@ -279,7 +330,7 @@ int ssufs_write(int file_handle, char *buf, int nbytes){
 		
 		origin[BLOCKSIZE]='\0';
 	//printf("totalblk:%d\n",totalblk);
-	printf("blkcnt:%d\n",blkcnt);
+	//printf("blkcnt:%d\n",blkcnt);
 	
 	
 	if(blkcnt==0)
@@ -291,7 +342,7 @@ int ssufs_write(int file_handle, char *buf, int nbytes){
 
 	int backup = start_offset % BLOCKSIZE;
 	//printf("updateblk_num:%d\n",update_blknum);
-	printf("firstblknum:%d\n",firstblknum);
+	//printf("firstblknum:%d\n",firstblknum);
 	int i;
 	if(totalblk>=0 && ((tmp->file_size % BLOCKSIZE) != 0)){//0 is blk1
 		blkuse=1;
@@ -367,7 +418,7 @@ int ssufs_write(int file_handle, char *buf, int nbytes){
 	for(int i=firstblknum;i<firstblknum+blkuse;i++){
 	//	printf("i:%d===============\n",i);
 	if(last_offset%BLOCKSIZE>=0 && tmp->file_size!=0 && overwritedone==0 && nbytes!=BLOCKSIZE){//continue write(same block)
-		printf("overwriting...\n");
+	//	printf("overwriting...\n");
 		overwritedone=1;
 		int i=firstblknum;
 			if(strlen(updatebuf)>BLOCKSIZE){
@@ -385,14 +436,14 @@ int ssufs_write(int file_handle, char *buf, int nbytes){
 		
 	}
 	if(tmp->file_size==0 || (totalblk>0 && blkuse>=2 && i!=firstblknum || nbytes==BLOCKSIZE)){
-		printf("new writing...\n");
-		printf("blkuse:%d\n",blkuse);
+		//printf("new writing...\n");
+		//printf("blkuse:%d\n",blkuse);
 		//for(int i=0;i<= totalblk;i++){
-			printf("debug update:%s\n",updatebuf);
+		//	printf("debug update:%s\n",updatebuf);
 			if(strlen(updatebuf2)==0 && strlen(updatebuf3)>0){
 		strcpy(updatebuf2,updatebuf3);
 	}
-	printf("firstblknum:%d blkue:%d\n",firstblknum,blkuse);
+	//printf("firstblknum:%d blkue:%d\n",firstblknum,blkuse);
 			if(tmp->direct_blocks[i]!=-1){				
 				if(blkuse==2 && i==1)
 					ssufs_writeDataBlock(tmp->direct_blocks[i], updatebuf2+i*BLOCKSIZE);
@@ -401,9 +452,10 @@ int ssufs_write(int file_handle, char *buf, int nbytes){
 				if(blkuse==4 && i==3)
 					ssufs_writeDataBlock(tmp->direct_blocks[i], updatebuf4+i*BLOCKSIZE);
 				else{
-					printf("here..? i:%d\n",i);	
-					printf("debug update:%s\n",updatebuf);
-					ssufs_writeDataBlock(tmp->direct_blocks[i], updatebuf);//+i*BLOCKSIZE);
+					if(nbytes==BLOCKSIZE)
+						ssufs_writeDataBlock(tmp->direct_blocks[i], updatebuf);//+i*BLOCKSIZE);
+					else
+						ssufs_writeDataBlock(tmp->direct_blocks[i], updatebuf+i*BLOCKSIZE);
 				}
 			
 			}
@@ -437,7 +489,7 @@ int ssufs_lseek(int file_handle, int nseek){
 	int fsize = tmp->file_size;
 	
 	offset += nseek;
-//	printf("offset:%d fsize:%d\n",offset, fsize);
+	printf("offset:%d fsize:%d\n",offset, fsize);
 	if ((fsize == -1) || (offset < 0) || (offset > fsize)) {
 		free(tmp);
 		return -1;
