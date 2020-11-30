@@ -107,9 +107,14 @@ int ssufs_read(int file_handle, char *buf, int nbytes){
 		//free(tmp);
 		return -1;
 	}
+	memset(buf,0,strlen(buf));
 	int start_offset=file_handle_array[file_handle].offset;
 	int last_offset=file_handle_array[file_handle].offset+nbytes;
-	
+	if(last_offset > 256){
+		printf("offset is over 256\n");
+		printf("buf:%s\n",buf);
+		return -1;
+	}
 	//if(blkcnt==0 && totalblk==3)
 	//	blkcnt=4;
 	
@@ -131,7 +136,7 @@ int ssufs_read(int file_handle, char *buf, int nbytes){
 	//	firstblknum=blknum-1;
 	
 	int totalblk = last_offset / BLOCKSIZE;//'0 totalblk' means using 1 block
-	//printf("totalblk:%d\n",totalblk);
+	printf("totalblk:%d\n",totalblk);
 	if(totalblk!=0){
 	if((last_offset % BLOCKSIZE) == 0)
 		totalblk--;
@@ -146,7 +151,7 @@ int ssufs_read(int file_handle, char *buf, int nbytes){
 		} 
 	}
 	int blkuse=0; //using block
-	if(totalblk>=0 && ((tmp->file_size % BLOCKSIZE) != 0)){//0 is blk1
+	if(totalblk>=0 && ((last_offset % BLOCKSIZE) != 0)){//0 is blk1
 		blkuse=1;
 		if(totalblk>=1 && (last_offset-BLOCKSIZE*totalblk) < nbytes){//uses two blk
 			blkuse=2;
@@ -159,9 +164,9 @@ int ssufs_read(int file_handle, char *buf, int nbytes){
 		}
 	}
 
-	//printf("firstblknum:%d\n",firstblknum);
+	printf("firstblknum:%d\n",firstblknum);
 	
-	//printf("blkuse:%d\n",blkuse);
+	printf("blkuse:%d\n",blkuse);
 	//int backup = (last_offset % BLOCKSIZE) - BLOCKSIZE;
 	int backup;
 	if(start_offset % BLOCKSIZE == 0)
@@ -174,15 +179,15 @@ int ssufs_read(int file_handle, char *buf, int nbytes){
 	//printf("before buf:%s\n",buf);
 	for(int i=firstblknum;i<blkuse+firstblknum;i++){//0 is blk1
 		ssufs_readDataBlock(tmp->direct_blocks[i],tmpbuf);//+i*BLOCKSIZE);
-		//printf("tmpbuf:%s\n",tmpbuf);
-		//printf("backup:%d\n",backup);
+		printf("tmpbuf:%s\n",tmpbuf);
+		printf("backup:%d\n",backup);
 		if(i==firstblknum){
 			if(blkuse>1){
-				//printf("i is firstblk and blkuse>1\n");
+				printf("i is firstblk and blkuse>1\n");
 				strncpy(buf, tmpbuf + start_offset%BLOCKSIZE, backup);//ex)!----32 bytes 
 			}
 			else if(blkuse==1){
-				//printf("i is firstblk and blkuse==1\n");
+				printf("i is firstblk and blkuse==1\n");
 				if(start_offset%BLOCKSIZE==0)
 					strncpy(buf, tmpbuf, nbytes);//ex)!---32 bytes of data----|
 				else
@@ -203,7 +208,7 @@ int ssufs_read(int file_handle, char *buf, int nbytes){
 	
 	
 	//file_handle_array[file_handle].offset = last_offset;//if succeed
-	//free(tmp);
+	free(tmp);
 	return 0;
 
 }
@@ -252,15 +257,16 @@ int ssufs_write(int file_handle, char *buf, int nbytes){
 			break;
 		}
 	}
-	if(blkcnt==0 && totalblk==3)
-		blkcnt=4;
+	printf("blkcnt:%d\\\\\\\\\\\n",blkcnt);
+	if(blkcnt==0 && totalblk==3)//time to overwrite last blk
+		blkcnt=3;
 	if(last_offset%BLOCKSIZE == nbytes){
 		blkcnt++;
 	}
 	else if(start_offset%BLOCKSIZE==0){
 		blkcnt++;
 	}
-	//printf("blkcnt:%d\\\\\\\\\\\n",blkcnt);
+	printf("blkcnt:%d\\\\\\\\\\\n",blkcnt);
 
 
 	int update_blknum = nbytes / BLOCKSIZE;
@@ -336,10 +342,12 @@ int ssufs_write(int file_handle, char *buf, int nbytes){
 	char updatebuf[BLOCKSIZE];
 	char updatebuf2[BLOCKSIZE];
 	char updatebuf3[BLOCKSIZE];
+	char updatebuff3[BLOCKSIZE];
 	char updatebuf4[BLOCKSIZE];
 	memset(updatebuf,0,BLOCKSIZE);//has origin+new data
 	memset(updatebuf2,0,BLOCKSIZE);;//only new data-->uses two blk
 	memset(updatebuf3,0,BLOCKSIZE);;//only new data-->uses three blk
+	memset(updatebuff3,0,BLOCKSIZE);;//only new data-->uses three blk
 	memset(updatebuf4,0,BLOCKSIZE);;//only new data-->uses four blk
 	//memset(tmpbuf2, -1 , BLOCKSIZE);
 	strncpy(tmpbuf, buf, nbytes);
@@ -387,17 +395,18 @@ int ssufs_write(int file_handle, char *buf, int nbytes){
 			
 		strcpy(updatebuf3,updatebuf2);
 		printf("debug update2:%s\n",updatebuf2);
-			if(totalblk>=2 && update_blknum>=1 && blkuse==2){//uses three blk
+			if(totalblk-firstblknum>=2 && ((last_offset-BLOCKSIZE*totalblk) < nbytes) && blkuse==2){//uses three blk
 				blkuse=3;
 				//updatebuf3[0]='\0';
-				strncpy(updatebuf3, tmpbuf+(BLOCKSIZE-backup)+BLOCKSIZE, nbytes-(BLOCKSIZE-backup)-BLOCKSIZE);
-				{
-					if(totalblk>=3 && update_blknum>=2 && blkuse==3){//uses four blk
+				strncpy(updatebuff3, tmpbuf+(BLOCKSIZE-backup), nbytes-(BLOCKSIZE-backup));
+			
+					if(totalblk-firstblknum>=3 && ((last_offset-BLOCKSIZE*totalblk) < nbytes) && blkuse==3){//uses four blk
 						blkuse=4;
 						//updatebuf4[0]='\0';
-						strncpy(updatebuf4, tmpbuf+(BLOCKSIZE-backup)+2*BLOCKSIZE, nbytes-(BLOCKSIZE-backup)-2*BLOCKSIZE);
+						strncpy(updatebuf4, tmpbuf+(BLOCKSIZE-backup), nbytes-(BLOCKSIZE-backup));
+						printf("debug update4:%s\n",updatebuf4);
 					}
-				}
+				
 			}
 		}
 	
@@ -480,30 +489,36 @@ int ssufs_write(int file_handle, char *buf, int nbytes){
 	for(int i=firstblknum;i<firstblknum+blkuse;i++){
 	//	printf("i:%d===============\n",i);
 	
-	if(tmp->file_size==0 || (totalblk>0 && blkuse>=2 && i!=firstblknum || nbytes==BLOCKSIZE)){
-		printf("new writing...\n");
-		printf("blkuse:%d\n",blkuse);
+		if(tmp->file_size==0 || (totalblk>0 && blkuse>=2 && i!=firstblknum || nbytes==BLOCKSIZE)){
+			printf("new writing...\n");
+			printf("blkuse:%d\n",blkuse);
 		//for(int i=0;i<= totalblk;i++){
 			printf("debug update:%s\n",updatebuf);
 			printf("debug update+i*BLOCKSIZE:%s\n",updatebuf+i*BLOCKSIZE);
-		
+			printf("debug update2:%s\n",updatebuf2);
 			if(strlen(updatebuf2)==0 && strlen(updatebuf3)>0){
 				strcpy(updatebuf2,updatebuf3);
+				printf("???debug update2:%s\n",updatebuf2);
 			}
 	//printf("firstblknum:%d blkue:%d\n",firstblknum,blkuse);
 		if(start_offset!=0){
 			if(tmp->direct_blocks[i]!=-1){				
-				if(blkuse>=2 && i==1)
-					ssufs_writeDataBlock(tmp->direct_blocks[i], updatebuf2+i*BLOCKSIZE);
-				if(blkuse>=3 && i==2)
-					ssufs_writeDataBlock(tmp->direct_blocks[i], updatebuf3+i*BLOCKSIZE);
-				if(blkuse>=4 && i==3)
-					ssufs_writeDataBlock(tmp->direct_blocks[i], updatebuf4+i*BLOCKSIZE);
+				if(blkuse>=2 && i==firstblknum+1){
+					printf("whreee\n");
+					printf("i:%d ++debug update2:%s\n",i,updatebuf2);
+					ssufs_writeDataBlock(tmp->direct_blocks[i], updatebuf2);//+i*BLOCKSIZE);
+					ssufs_dump();
+					//ssufs_writeInode(inodenum, tmp);
+				}
+				if(blkuse>=3 && i==firstblknum+2)
+					ssufs_writeDataBlock(tmp->direct_blocks[i], updatebuff3);//+i*BLOCKSIZE);
+				if(blkuse>=4 && i==firstblknum+3)
+					ssufs_writeDataBlock(tmp->direct_blocks[i], updatebuf4);//+i*BLOCKSIZE);
 				else{
 					if(nbytes==BLOCKSIZE)
 						ssufs_writeDataBlock(tmp->direct_blocks[i], updatebuf);//+i*BLOCKSIZE);
 					else
-						ssufs_writeDataBlock(tmp->direct_blocks[i], updatebuf+i*BLOCKSIZE);
+						ssufs_writeDataBlock(tmp->direct_blocks[i], updatebuf);//+i*BLOCKSIZE);
 				}
 			
 			}
@@ -514,23 +529,24 @@ int ssufs_write(int file_handle, char *buf, int nbytes){
 					printf("hi i:%d\n",i);
 					ssufs_writeDataBlock(tmp->direct_blocks[i], tmpbuf+i*BLOCKSIZE);
 						printf("debug copy2:%s\n",tmpbuf+i*BLOCKSIZE);
+
+					if(blkuse>=3 && i==2)
+						ssufs_writeDataBlock(tmp->direct_blocks[i], copybuf3);//+i*BLOCKSIZE);
+					if(blkuse>=4 && i==3)
+						ssufs_writeDataBlock(tmp->direct_blocks[i], copybuf4);//+i*BLOCKSIZE);
 				}
-				if(blkuse>=3 && i==2)
-					ssufs_writeDataBlock(tmp->direct_blocks[i], copybuf3);//+i*BLOCKSIZE);
-				if(blkuse>=4 && i==3)
-					ssufs_writeDataBlock(tmp->direct_blocks[i], copybuf4+i*BLOCKSIZE);
 				else{
 					if(nbytes==BLOCKSIZE)
 						ssufs_writeDataBlock(tmp->direct_blocks[i], updatebuf);//+i*BLOCKSIZE);
 					else{
 						printf("hello i:%d\n",i);
-						ssufs_writeDataBlock(tmp->direct_blocks[i], updatebuf+i*BLOCKSIZE);
+						ssufs_writeDataBlock(tmp->direct_blocks[i], updatebuf);//+i*BLOCKSIZE);
 					}
 				}
 			
 			}
 		}
-
+		printf("i:%d ++debug update2:%s\n",i,updatebuf2);
 		tmp->file_size = start_offset+nbytes;
 		ssufs_writeInode(inodenum, tmp);
 		ssufs_lseek(file_handle, nbytes);
@@ -566,7 +582,7 @@ int ssufs_lseek(int file_handle, int nseek){
 	int fsize = tmp->file_size;
 	
 	offset += nseek;
-	
+	printf("offset:%d size:%d\n",offset, fsize);
 	if ((fsize == -1) || (offset < 0) || (offset > fsize)) {
 		free(tmp);
 		return -1;
