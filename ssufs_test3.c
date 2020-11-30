@@ -20,7 +20,7 @@ int main()
 
    ssufs_create("f2.txt");
     int fd2 = ssufs_open("f2.txt");
-
+    printf("opened f2, filehandle:%d\n",fd2);
     printf("Write Data: %d\n", ssufs_write(fd2, str, BLOCKSIZE));
     printf("Write Data: %d\n", ssufs_write(fd2, str, BLOCKSIZE));
     printf("Write Data: %d\n", ssufs_write(fd2, str, BLOCKSIZE));
@@ -28,7 +28,9 @@ int main()
     ssufs_dump();
 
     ssufs_delete("f1.txt");
+    printf("deleted f1\n");
     ssufs_dump();
+    printf("deleted f2\n");
     ssufs_delete("f2.txt");
     ssufs_dump();
 }
